@@ -60,6 +60,12 @@ experimental_bearer_token = "your-provider-token"
 
 The wrapper reads these fields only at execution time. It does not copy them into the skill directory or terminal output. Environment variables take precedence over this configuration.
 
+### Configuration Scope
+
+For this skill's fallback wrapper, only `base_url` and `experimental_bearer_token` are required from `config.toml`. It does not read `~/.codex/auth.json`; that file is part of Codex's own login state and may be empty when ChatGPT authentication is stored elsewhere.
+
+Other fields commonly found in a complete Codex setup, such as top-level `model_provider` and `model`, or provider-level `name` and `wire_api`, control how Codex itself connects to an LLM. They are not needed for this image-generation wrapper. Configure them only when you also intend to run Codex itself through that third-party provider.
+
 ## Generate an Image
 
 Ask Codex to use `$configured-imagegen`, or invoke the wrapper directly:

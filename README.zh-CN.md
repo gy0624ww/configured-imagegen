@@ -62,6 +62,12 @@ experimental_bearer_token = "your-provider-token"
 
 包装脚本只在执行时读取这些字段，不会将它们复制到技能目录或打印到终端。环境变量优先于此配置。
 
+### 配置范围
+
+对本技能的 CLI 兜底包装器而言，`config.toml` 中只有 `base_url` 和 `experimental_bearer_token` 是必需的。它不会读取 `~/.codex/auth.json`；该文件属于 Codex 自身的登录状态，在 ChatGPT 登录凭据存储于其他位置时，它可能为空。
+
+常见的完整 Codex 配置还可能包含顶层的 `model_provider`、`model`，以及 provider 下的 `name`、`wire_api`。这些字段控制 Codex 本身如何连接 LLM，并不是此生图包装器的必需项。只有在你也希望整个 Codex 会话经由该第三方 provider 运行时，才需要额外配置它们。
+
 ## 生成图片
 
 在 Codex 中要求使用 `$configured-imagegen`，或直接调用包装脚本：
