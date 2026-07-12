@@ -1,0 +1,4 @@
+interface:
+  display_name: "Configured Image Generation"
+  short_description: "Generate images through your configured provider."
+  default_prompt: "Use $configured-imagegen to generate a polished image with my configured provider."
