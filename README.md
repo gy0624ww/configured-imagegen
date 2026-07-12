@@ -1,5 +1,7 @@
 # Configured Image Generation for Codex
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 Use GPT Image models from Codex when the native `image_gen` tool is not available in a desktop task. The skill invokes the bundled GPT Image CLI through an isolated Python environment and supplies credentials from either standard environment variables or a Codex OpenAI-compatible provider configuration.
 
 ## Why this exists
