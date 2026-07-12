@@ -1,4 +1,4 @@
-# Configured Image Generation for Codex
+# Configured Image Generation Skill for Codex
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
@@ -28,7 +28,7 @@ The skill never stores a key in the repository. Each user supplies their own Ope
 Clone the repository into the global Codex skills directory:
 
 ```zsh
-git clone https://github.com/gy0624ww/configured-imagegen.git \
+git clone https://github.com/gy0624ww/configured-imagegen-skill.git \
   ~/.codex/skills/configured-imagegen
 ~/.codex/skills/configured-imagegen/scripts/setup_imagegen_env.sh
 ```

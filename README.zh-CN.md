@@ -1,4 +1,4 @@
-# Codex 配置化图片生成技能
+# Codex 配置化生图技能
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
@@ -30,7 +30,7 @@
 将仓库克隆到全局 Codex 技能目录：
 
 ```zsh
-git clone https://github.com/gy0624ww/configured-imagegen.git \
+git clone https://github.com/gy0624ww/configured-imagegen-skill.git \
   ~/.codex/skills/configured-imagegen
 ~/.codex/skills/configured-imagegen/scripts/setup_imagegen_env.sh
 ```
