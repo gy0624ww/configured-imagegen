@@ -12,7 +12,7 @@ This skill bridges that gap. It keeps native generation as the first choice, and
 
 1. runs the bundled GPT Image CLI with a current, isolated OpenAI Python SDK;
 2. uses `OPENAI_API_KEY` and `OPENAI_BASE_URL` when they are already set; or
-3. falls back to `model_providers.OpenAI.experimental_bearer_token` and `base_url` in the local Codex configuration.
+3. selects the provider named by top-level `model_provider` and reads its `experimental_bearer_token` (or `env_key`) and `base_url` from the local Codex configuration.
 
 The skill never stores a key in the repository. Each user supplies their own OpenAI API key or compatible third-party provider token.
 
@@ -28,9 +28,11 @@ The skill never stores a key in the repository. Each user supplies their own Ope
 Clone the repository into the global Codex skills directory:
 
 ```zsh
+codex_home="${CODEX_HOME:-$HOME/.codex}"
+mkdir -p "$codex_home/skills"
 git clone https://github.com/gy0624ww/configured-imagegen-skill.git \
-  ~/.codex/skills/configured-imagegen
-~/.codex/skills/configured-imagegen/scripts/setup_imagegen_env.sh
+  "$codex_home/skills/configured-imagegen"
+sh "$codex_home/skills/configured-imagegen/scripts/setup_imagegen_env.sh"
 ```
 
 Open a new Codex task after installation so Codex discovers the skill. The virtual environment is created locally and is intentionally ignored by Git.
@@ -53,25 +55,39 @@ Do not put an API key in the repository, commit history, or issue tracker.
 For users already routing Codex through an OpenAI-compatible provider, configure their own local `~/.codex/config.toml`:
 
 ```toml
-[model_providers.OpenAI]
+model_provider = "my-provider"
+
+[model_providers.my-provider]
 base_url = "https://your-compatible-provider.example/v1"
 experimental_bearer_token = "your-provider-token"
 ```
 
-The wrapper reads these fields only at execution time. It does not copy them into the skill directory or terminal output. Environment variables take precedence over this configuration.
+The provider table name is not fixed. By default, the wrapper follows top-level `model_provider`; `CODEX_IMAGEGEN_PROVIDER` can override it for image generation. If neither is set, a single configured provider is selected automatically. Existing `[model_providers.OpenAI]` configurations remain supported.
+
+Instead of storing a token in TOML, a provider may name an environment variable:
+
+```toml
+model_provider = "my-provider"
+
+[model_providers.my-provider]
+base_url = "https://your-compatible-provider.example/v1"
+env_key = "MY_PROVIDER_API_KEY"
+```
+
+The wrapper reads these fields only at execution time. It does not copy them into the skill directory or terminal output. `OPENAI_API_KEY` and `OPENAI_BASE_URL` take precedence over provider configuration.
 
 ### Configuration Scope
 
-For this skill's fallback wrapper, only `base_url` and `experimental_bearer_token` are required from `config.toml`. It does not read `~/.codex/auth.json`; that file is part of Codex's own login state and may be empty when ChatGPT authentication is stored elsewhere.
+For this skill's fallback wrapper, the relevant provider fields are `base_url` plus either `experimental_bearer_token` or `env_key`. It does not read `~/.codex/auth.json`; that file is part of Codex's own login state and may be empty when ChatGPT authentication is stored elsewhere.
 
-Other fields commonly found in a complete Codex setup, such as top-level `model_provider` and `model`, or provider-level `name` and `wire_api`, control how Codex itself connects to an LLM. They are not needed for this image-generation wrapper. Configure them only when you also intend to run Codex itself through that third-party provider.
+The wrapper uses top-level `model_provider` only to select the matching table under `model_providers`. Fields such as top-level `model`, or provider-level `name` and `wire_api`, continue to control Codex itself and are not used for image generation.
 
 ## Generate an Image
 
 Ask Codex to use `$configured-imagegen`, or invoke the wrapper directly:
 
 ```zsh
-~/.codex/skills/configured-imagegen/scripts/run_imagegen.sh generate \
+sh ~/.codex/skills/configured-imagegen/scripts/run_imagegen.sh generate \
   --prompt "A photorealistic product photograph of a ceramic mug on a stone table" \
   --size 1024x1024 \
   --out output/imagegen/mug.png
@@ -80,7 +96,7 @@ Ask Codex to use `$configured-imagegen`, or invoke the wrapper directly:
 For an edit, use the same wrapper with the bundled CLI's `edit` command and its image arguments:
 
 ```zsh
-~/.codex/skills/configured-imagegen/scripts/run_imagegen.sh edit \
+sh ~/.codex/skills/configured-imagegen/scripts/run_imagegen.sh edit \
   --image input.png \
   --prompt "Replace only the background with a warm sunset" \
   --out output/imagegen/sunset-edit.png
@@ -94,7 +110,7 @@ The wrapper explicitly selects `gpt-image-2`, rather than relying on a CLI defau
 
 ```zsh
 CODEX_IMAGEGEN_MODEL="gpt-image-2" \
-  ~/.codex/skills/configured-imagegen/scripts/run_imagegen.sh generate ...
+  sh ~/.codex/skills/configured-imagegen/scripts/run_imagegen.sh generate ...
 ```
 
 An explicit CLI `--model` argument overrides the wrapper default. `gpt-image-2` does not support native transparent backgrounds; use the normal Codex chroma-key workflow or deliberately select a compatible model when native transparency is required.
@@ -104,8 +120,9 @@ An explicit CLI `--model` argument overrides the wrapper default. `gpt-image-2` 
 | Symptom | Cause and fix |
 | --- | --- |
 | `image_gen` is unavailable | Use this skill's wrapper. It is intended for this fallback path. |
-| Python environment is missing | Run `scripts/setup_imagegen_env.sh`. |
-| `OPENAI_API_KEY` is not set | Export the variable or add the provider token to the local Codex configuration shown above. |
+| Python environment is missing | Run `sh scripts/setup_imagegen_env.sh` from the skill directory. The path is discovered dynamically. |
+| `OPENAI_API_KEY` is not set | Export it, configure the selected provider's token, or set the environment variable named by `env_key`. |
+| Wrong provider is selected | Check top-level `model_provider`, or set `CODEX_IMAGEGEN_PROVIDER` to the desired provider table name. |
 | Authentication or model error | Verify the provider URL, token, billing, and support for `gpt-image-2`. |
 | Unsupported `output_format` argument | Re-run the setup script. It installs an isolated current OpenAI SDK. |
 | Generated file is missing | Check the command error, output directory permissions, and provider response before retrying. |

@@ -14,7 +14,7 @@
 
 1. 使用独立且较新的 OpenAI Python SDK 运行内置 GPT Image CLI；
 2. 优先读取已设置的 `OPENAI_API_KEY` 与 `OPENAI_BASE_URL`；
-3. 若环境变量不存在，再读取本机 `model_providers.OpenAI.experimental_bearer_token` 和 `base_url`。
+3. 根据顶层 `model_provider` 选择 provider，并读取对应配置中的 `experimental_bearer_token`（或 `env_key`）和 `base_url`。
 
 仓库不包含任何 key。每位使用者必须配置自己的 OpenAI API key 或第三方兼容服务令牌。
 
@@ -30,9 +30,11 @@
 将仓库克隆到全局 Codex 技能目录：
 
 ```zsh
+codex_home="${CODEX_HOME:-$HOME/.codex}"
+mkdir -p "$codex_home/skills"
 git clone https://github.com/gy0624ww/configured-imagegen-skill.git \
-  ~/.codex/skills/configured-imagegen
-~/.codex/skills/configured-imagegen/scripts/setup_imagegen_env.sh
+  "$codex_home/skills/configured-imagegen"
+sh "$codex_home/skills/configured-imagegen/scripts/setup_imagegen_env.sh"
 ```
 
 安装后请新建一个 Codex 任务，让 Codex 自动发现该技能。虚拟环境会在本机创建，且被 Git 忽略。
@@ -55,25 +57,39 @@ export OPENAI_BASE_URL="https://your-compatible-provider.example/v1"
 如果你已经通过 OpenAI 兼容服务使用 Codex，可以在自己的 `~/.codex/config.toml` 中配置：
 
 ```toml
-[model_providers.OpenAI]
+model_provider = "my-provider"
+
+[model_providers.my-provider]
 base_url = "https://your-compatible-provider.example/v1"
 experimental_bearer_token = "your-provider-token"
 ```
 
-包装脚本只在执行时读取这些字段，不会将它们复制到技能目录或打印到终端。环境变量优先于此配置。
+provider 表名不是固定值。包装脚本默认跟随顶层 `model_provider`；也可通过 `CODEX_IMAGEGEN_PROVIDER` 单独覆盖生图所用 provider。两者都未设置时，若只配置了一个 provider，会自动选择它。已有的 `[model_providers.OpenAI]` 配置仍然兼容。
+
+也可以不把 token 写入 TOML，而是让 provider 指定环境变量名：
+
+```toml
+model_provider = "my-provider"
+
+[model_providers.my-provider]
+base_url = "https://your-compatible-provider.example/v1"
+env_key = "MY_PROVIDER_API_KEY"
+```
+
+包装脚本只在执行时读取这些字段，不会将它们复制到技能目录或打印到终端。`OPENAI_API_KEY` 和 `OPENAI_BASE_URL` 的优先级高于 provider 配置。
 
 ### 配置范围
 
-对本技能的 CLI 兜底包装器而言，`config.toml` 中只有 `base_url` 和 `experimental_bearer_token` 是必需的。它不会读取 `~/.codex/auth.json`；该文件属于 Codex 自身的登录状态，在 ChatGPT 登录凭据存储于其他位置时，它可能为空。
+对本技能的 CLI 兜底包装器而言，相关 provider 字段是 `base_url`，以及 `experimental_bearer_token` 或 `env_key` 二者之一。它不会读取 `~/.codex/auth.json`；该文件属于 Codex 自身的登录状态，在 ChatGPT 登录凭据存储于其他位置时，它可能为空。
 
-常见的完整 Codex 配置还可能包含顶层的 `model_provider`、`model`，以及 provider 下的 `name`、`wire_api`。这些字段控制 Codex 本身如何连接 LLM，并不是此生图包装器的必需项。只有在你也希望整个 Codex 会话经由该第三方 provider 运行时，才需要额外配置它们。
+包装脚本只使用顶层 `model_provider` 来选择 `model_providers` 下的同名配置表。顶层 `model` 以及 provider 中的 `name`、`wire_api` 等字段仍用于控制 Codex 本身，不参与生图。
 
 ## 生成图片
 
 在 Codex 中要求使用 `$configured-imagegen`，或直接调用包装脚本：
 
 ```zsh
-~/.codex/skills/configured-imagegen/scripts/run_imagegen.sh generate \
+sh ~/.codex/skills/configured-imagegen/scripts/run_imagegen.sh generate \
   --prompt "一张陶瓷马克杯放在石质桌面上的写实产品照片" \
   --size 1024x1024 \
   --out output/imagegen/mug.png
@@ -82,7 +98,7 @@ experimental_bearer_token = "your-provider-token"
 编辑图片时，使用同一包装脚本与内置 CLI 的 `edit` 命令：
 
 ```zsh
-~/.codex/skills/configured-imagegen/scripts/run_imagegen.sh edit \
+sh ~/.codex/skills/configured-imagegen/scripts/run_imagegen.sh edit \
   --image input.png \
   --prompt "仅将背景替换为温暖的日落场景" \
   --out output/imagegen/sunset-edit.png
@@ -96,7 +112,7 @@ experimental_bearer_token = "your-provider-token"
 
 ```zsh
 CODEX_IMAGEGEN_MODEL="gpt-image-2" \
-  ~/.codex/skills/configured-imagegen/scripts/run_imagegen.sh generate ...
+  sh ~/.codex/skills/configured-imagegen/scripts/run_imagegen.sh generate ...
 ```
 
 显式传入的 CLI `--model` 参数会覆盖包装脚本默认值。`gpt-image-2` 不支持原生透明背景；需要透明背景时，请使用 Codex 的色键抠图流程，或有意识地选择支持该能力的兼容模型。
@@ -106,8 +122,9 @@ CODEX_IMAGEGEN_MODEL="gpt-image-2" \
 | 现象 | 原因与解决方式 |
 | --- | --- |
 | `image_gen` 不可用 | 使用本技能的包装脚本，它就是为该兜底路径设计的。 |
-| 缺少 Python 环境 | 运行 `scripts/setup_imagegen_env.sh`。 |
-| `OPENAI_API_KEY` 未设置 | 设置环境变量，或按上文在本机 Codex 配置中设置第三方服务令牌。 |
+| 缺少 Python 环境 | 在技能目录中运行 `sh scripts/setup_imagegen_env.sh`，脚本会动态识别实际安装路径。 |
+| `OPENAI_API_KEY` 未设置 | 设置该变量、配置所选 provider 的 token，或设置其 `env_key` 指向的环境变量。 |
+| 选错 provider | 检查顶层 `model_provider`，或用 `CODEX_IMAGEGEN_PROVIDER` 指定目标 provider 表名。 |
 | 认证或模型报错 | 检查服务地址、令牌、余额与服务端对 `gpt-image-2` 的支持。 |
 | 不支持 `output_format` 参数 | 重新运行安装脚本，以安装隔离的新版 OpenAI SDK。 |
 | 没有生成输出文件 | 检查命令错误、输出目录权限与服务端响应后再重试。 |
